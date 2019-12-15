@@ -102,6 +102,11 @@ class notemodel
 
     public function _send()
     {
+
+		if(!is_numeric(constant("UC_APPID"))) {
+			return NULL;
+		}
+
         $note = $this->_get_note();
         if (empty($note)) {
             $this->db->query('REPLACE INTO '.UC_DBTABLEPRE."vars SET name='noteexists".UC_APPID."', value='0'");
@@ -164,6 +169,10 @@ class notemodel
 
     public function _get_note()
     {
+
+		if(!is_numeric(constant("UC_APPID"))) {
+			return NULL;
+		}
         $app_field = 'app'.UC_APPID;
         $data = $this->db->fetch_first('SELECT * FROM '.UC_DBTABLEPRE."notelist WHERE closed='0' AND $app_field<'1' AND $app_field>'-".UC_NOTE_REPEAT."' LIMIT 1");
 

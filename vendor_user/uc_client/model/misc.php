@@ -64,7 +64,7 @@ class miscmodel
     {
     }
 
-    public function dfopen2($url, $limit = 0, $post = '', $cookie = '', $bysocket = false, $ip = '', $timeout = 15, $block = true, $encodetype = 'URLENCODE')
+    public function dfopen2($url, $limit = 0, $post = '', $cookie = '', $bysocket = false, $ip = '', $timeout = 15, $block = true, $encodetype = 'urlencode', $allowcurl = true)
     {
         $__times__ = isset($_GET['__times__']) ? intval($_GET['__times__']) + 1 : 1;
         if ($__times__ > 2) {
@@ -72,10 +72,10 @@ class miscmodel
         }
         $url .= (false === strpos($url, '?') ? '?' : '&')."__times__=$__times__";
 
-        return $this->dfopen($url, $limit, $post, $cookie, $bysocket, $ip, $timeout, $block, $encodetype);
+        return $this->dfopen($url, $limit, $post, $cookie, $bysocket, $ip, $timeout, $block, $encodetype, $allowcurl);
     }
 
-    public function dfopen($url, $limit = 0, $post = '', $cookie = '', $bysocket = false, $ip = '', $timeout = 15, $block = true, $encodetype = 'URLENCODE')
+    public function dfopen($url, $limit = 0, $post = '', $cookie = '', $bysocket = false, $ip = '', $timeout = 15, $block = true, $encodetype = 'urlencode', $allowcurl = true)
     {
         //error_log("[uc_client]\r\nurl: $url\r\npost: $post\r\n\r\n", 3, 'c:/log/php_fopen.txt');
         $return = '';
@@ -84,6 +84,37 @@ class miscmodel
         $host = $matches['host'];
         $path = $matches['path'] ? $matches['path'].($matches['query'] ? '?'.$matches['query'] : '') : '/';
         $port = !empty($matches['port']) ? $matches['port'] : ('https' == $matches['scheme'] ? 443 : 80);
+
+		if(function_exists('curl_init') && function_exists('curl_exec') && $allowcurl) {
+			$ch = curl_init();
+			$ip && curl_setopt($ch, CURLOPT_HTTPHEADER, array("Host: ".$host));
+			curl_setopt($ch, CURLOPT_URL, $scheme.'://'.($ip ? $ip : $host).':'.$port.$path);
+			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+			if($post) {
+				curl_setopt($ch, CURLOPT_POST, 1);
+				if($encodetype == 'URLENCODE') {
+					curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+				} else {
+					parse_str($post, $postarray);
+					curl_setopt($ch, CURLOPT_POSTFIELDS, $postarray);
+				}
+			}
+			if($cookie) {
+				curl_setopt($ch, CURLOPT_COOKIE, $cookie);
+			}
+			curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+			$data = curl_exec($ch);
+			$status = curl_getinfo($ch);
+			$errno = curl_errno($ch);
+			curl_close($ch);
+			if($errno || $status['http_code'] != 200) {
+				return;
+			} else {
+				return !$limit ? $data : substr($data, 0, $limit);
+			}
+		}
 
         if ($post) {
             $out = "POST $path HTTP/1.0\r\n";
@@ -111,9 +142,9 @@ class miscmodel
         }
 
         if (function_exists('fsockopen')) {
-            $fp = @fsockopen(('https' == $scheme ? 'ssl' : $scheme).'://'.('https' == $scheme ? $host : ($ip ? $ip : $host)), $port, $errno, $errstr, $timeout);
+            $fp = @fsockopen(('https' == $scheme ? 'ssl' ://' : '').('https' == $scheme ? $host : ($ip ? $ip : $host)), $port, $errno, $errstr, $timeout);
         } elseif (function_exists('pfsockopen')) {
-            $fp = @pfsockopen(('https' == $scheme ? 'ssl' : $scheme).'://'.('https' == $scheme ? $host : ($ip ? $ip : $host)), $port, $errno, $errstr, $timeout);
+            $fp = @pfsockopen(('https' == $scheme ? 'ssl' ://' : '').('https' == $scheme ? $host : ($ip ? $ip : $host)), $port, $errno, $errstr, $timeout);
         } else {
             $fp = false;
         }
